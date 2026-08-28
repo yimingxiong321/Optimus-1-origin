@@ -3,8 +3,10 @@ from typing import List
 
 import torch
 
-from ..models.deepseek_vl_planning import PlanningModel as DeepSeekPlanningModel
-from ..models.gpt4_planning import PlanningModel as GPT4PlanningModel
+from ..models.qwen_vl_planning import (
+    DEFAULT_MODEL_PATH,
+    PlanningModel as QwenVLPlanningModel,
+)
 from ..models.steve_action_model import ActionModel as SteveActionModel
 
 logger = logging.getLogger(__name__)
@@ -12,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 PLAN_MODEL_PATH = {
     "deepseek-vl": "deepseek-vl-7b-chat",
+}
+QWEN_VL_MODELS = {
+    "qwen-vl",
+    "Qwen/Qwen2.5-VL-7B-Instruct",
+    "Qwen/Qwen2-VL-2B-Instruct",
+    DEFAULT_MODEL_PATH,
 }
 
 
@@ -28,13 +36,27 @@ class Agent:
     ) -> None:
         self.plan_with_gpt = plan_with_gpt
         if plan_with_gpt:
+            from ..models.gpt4_planning import PlanningModel as GPT4PlanningModel
+
             self.gpt_v = True
             self.plan_model = GPT4PlanningModel()
             logger.info("gpt4o as planning model")
             self.reflection_model = self.plan_model
         else:
-            logger.info("Using DeepSeek-VL for planning.")
-            if plan_model == "deepseek-vl":
+            if plan_model in QWEN_VL_MODELS:
+                model_path = (
+                    DEFAULT_MODEL_PATH
+                    if plan_model == "qwen-vl"
+                    else plan_model
+                )
+                logger.info(f"Using Qwen-VL for planning: {model_path}")
+                self.plan_model = QwenVLPlanningModel(model_path)
+            elif plan_model == "deepseek-vl":
+                from ..models.deepseek_vl_planning import (
+                    PlanningModel as DeepSeekPlanningModel,
+                )
+
+                logger.info("Using DeepSeek-VL for planning.")
                 self.plan_model = DeepSeekPlanningModel(PLAN_MODEL_PATH[plan_model])
             else:
                 raise ValueError(f"Unknown plan model: {plan_model}")

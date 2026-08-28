@@ -21,3 +21,19 @@ videos/
 imgs
 *.zip
 *.tar.gz
+
+# Memory data (download from HuggingFace, see README)
+src/optimus1/memories/v1/
+src/optimus1/memories/v1_hf_download/
+
+# HuggingFace cache
+.cache/
+**/.cache/
+
+# MineRL / MCP-Reborn build artifacts
+minerl/minerl/MCP-Reborn/
+minerl/src/
+minerl/gradle.properties
+minerl/launchClient.bat
+minerl/launchClient.sh
+.gradle/

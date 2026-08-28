@@ -1,4 +1,9 @@
 #!/bin/bash
 
+set -euo pipefail
 
-python -m optimus1.test_optimus1 server.port=9000 evaluate="[0]"
+cd "$(dirname "$0")/.."
+
+export OPTIMUS_PORT="${OPTIMUS_PORT:-9100}"
+
+xvfb-run -a python -m optimus1.test_optimus1 "server.port=${OPTIMUS_PORT}" evaluate=[0]

@@ -1,6 +1,9 @@
 #!/bin/bash
 
+set -euo pipefail
 
-python -m optimus1.main server.port=9000 benchmark=diamond evaluate="[0,1,2,3,4,5,6]" env.times=30 & 
+cd "$(dirname "$0")/.."
 
-wait
+export OPTIMUS_PORT="${OPTIMUS_PORT:-9100}"
+
+xvfb-run -a python -m optimus1.main "server.port=${OPTIMUS_PORT}" benchmark=diamond evaluate=[0,1,2,3,4,5,6] env.times=30

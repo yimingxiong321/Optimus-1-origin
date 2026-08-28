@@ -8,11 +8,12 @@ from optimus1.server.api.request import MCRequest, MCResponse
 from optimus1.server.api.utils import base64_to_image, base64lst2img_path
 
 IMAGE_ROOT = "imgs"
+PLAN_MODEL = os.getenv("OPTIMUS_PLAN_MODEL", "qwen-vl")
 
 app = FastAPI()
 agent = AgentFactory.get_agent(
-    plan_with_gpt=True,
-    plan_model=None,
+    plan_with_gpt=False,
+    plan_model=PLAN_MODEL,
     in_model="checkpoints/vpt/2x.model",
     in_weights="checkpoints/steve1/steve1.weights",
     prior_weights="checkpoints/steve1/steve1_prior.pt",
