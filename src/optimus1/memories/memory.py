@@ -8,7 +8,7 @@ import shortuuid
 from omegaconf import DictConfig
 from thefuzz import process
 
-from ..util.prompt import render_replan_example
+from ..util.prompt import plan_ends_with_task, render_replan_example, trim_plan_to_task
 from ..util.thread import MultiThreadServerAPI
 
 from .graph import KnowledgeGraph
@@ -242,7 +242,7 @@ class Memory:
                 json.dump(memory, fp, indent=2)
 
     def retrieve_plan(self, task: str):
-        task = task.replace(" ", "_").lower()
+        task_key = task.replace(" ", "_").lower()
         has_done = False
 
         def get_best_match_recipe(target: str, choices):
@@ -254,8 +254,8 @@ class Memory:
         except FileNotFoundError:
             # from stratch
             return None, False
-        target = get_best_match_recipe(task + ".json", lst_dir)
-        has_done = task + ".json" == target
+        target = get_best_match_recipe(task_key + ".json", lst_dir)
+        name_matched = target.lower() == task_key + ".json"
         print(f"Find example: {target}")
         with open(
             os.path.join(f"src/optimus1/memories/{self.version}/plan/success", target),
@@ -263,7 +263,22 @@ class Memory:
         ) as fi:
             data = json.load(fi)
 
-        plan = data["plan"][0]["planning"]
+        entries = data.get("plan") or []
+        chosen = None
+        for entry in entries:
+            planning = entry.get("planning") or []
+            if plan_ends_with_task(planning, task):
+                chosen = entry
+                break
+        if chosen is None and entries:
+            chosen = entries[0]
+
+        if chosen is None:
+            return None, False
+
+        plan = chosen.get("planning") or []
+        has_done = name_matched and plan_ends_with_task(plan, task)
+        plan = trim_plan_to_task(plan, task)
 
         render_plan = {}
         for idx, p in enumerate(plan):
@@ -271,10 +286,10 @@ class Memory:
 
         goal = (
             plan[-1]["goal"][0]
-            if "goal" not in data["plan"][0]
-            else data["plan"][0]["goal"]
+            if "goal" not in chosen
+            else chosen["goal"]
         )
-        visual_info = data["plan"][0].get("visual_info", "None")
+        visual_info = chosen.get("visual_info", "None")
 
         examples = PLAN_EXAMPLE_FORMAT.format(
             target.replace(".json", "").replace("_", " "),

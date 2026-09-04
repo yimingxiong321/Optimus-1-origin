@@ -25,6 +25,7 @@ from optimus1.util import (
     get_logger,
     pretty_result,
     render_gpt4_plan,
+    trim_plan_to_task,
     render_reflection,
     save_obs,
 )
@@ -115,7 +116,11 @@ def agent_do(
                 if not env.can_open_inventory:
                     env.can_open_inventory = True
                 helper.reset(task, pbar, num_step, logger)
-                done, info = helper.step(task, goal)  # type: ignore
+                try:
+                    done, info = helper.step(task, goal)  # type: ignore
+                except RuntimeError as exc:
+                    logger.warning(f"[red]{task} aborted: {exc}[/red]")
+                    done, info = False, str(exc)
                 steps = helper.get_task_steps(task)
 
                 env.can_open_inventory = False
@@ -276,8 +281,6 @@ def main(cfg: DictConfig):
     logger.info(OmegaConf.to_yaml(cfg))
     REFLECTION_IMAGE_ROOT = f"src/optimus1/memories/{cfg['version']}/reflection/img"
 
-    env = env_make(cfg["env"]["name"], cfg, logger)
-
     memory_bank = Memory(cfg, logger)
 
     if cfg["task"]["interactive"] and cfg["type"] != "headless":
@@ -289,80 +292,90 @@ def main(cfg: DictConfig):
     times = cfg["env"]["times"]
     for task in evaluate_tasks:
         monitors = []
+        env = env_make(cfg["env"]["name"], cfg, logger)
+        logger.info(f"[green]Created fresh MineRL env for task: {task}[/green]")
 
-        for _ in range(times):
-            t = ServerAPI.reset(cfg["server"])
-            logger.info("[red]env & server reset...[/red] ")
-            obs = env.reset()
-            t.join()
+        try:
+            for _ in range(times):
+                t = ServerAPI.reset(cfg["server"])
+                logger.info("[red]env & server reset...[/red] ")
+                obs = env.reset()
+                t.join()
 
-            while True:
-                try:
-                    retrieval_info = ServerAPI.get_retrieval(cfg["server"], obs, task)
-                    goal, visual_info, environment = get_info_from_plan(retrieval_info)
-                    # goal, visual_info, environment = "diamond", "full", "forest"
-                    print(goal, visual_info, environment)
+                while True:
+                    try:
+                        retrieval_info = ServerAPI.get_retrieval(cfg["server"], obs, task)
+                        goal, visual_info, environment = get_info_from_plan(retrieval_info)
+                        # goal, visual_info, environment = "diamond", "full", "forest"
+                        print(goal, visual_info, environment)
 
-                    memory_bank.current_environment = environment
-                    example, has_done = memory_bank.retrieve_plan(task)
-                    print(example, has_done)
+                        memory_bank.current_environment = environment
+                        example, has_done = memory_bank.retrieve_plan(task)
+                        print(example, has_done)
 
-                    if example is None:
-                        example = EXAMPLE
-                    # example = EXAMPLE
-                    logger.info(example + str(has_done))
-                    graph = memory_bank.retrieve_graph(goal)
-                    logger.info(f"Graph: {graph}")
+                        if example is None:
+                            example = EXAMPLE
+                        # example = EXAMPLE
+                        logger.info(example + str(has_done))
+                        graph = memory_bank.retrieve_graph(goal)
+                        logger.info(f"Graph: {graph}")
 
-                    if not has_done:
-                        planning = ServerAPI.get_plan(
-                            cfg["server"], obs, task, None, example, graph, visual_info
-                        )
-                    else:
+                        if not has_done:
+                            planning = ServerAPI.get_plan(
+                                cfg["server"], obs, task, None, example, graph, visual_info
+                            )
+                        else:
+                            planning = example
+                        planning = render_gpt4_plan(planning)
+                        break
+                    except Exception as e:
                         planning = example
-                    planning = render_gpt4_plan(planning)
-                    break
+                        planning = render_gpt4_plan(planning)
+                        break
+
+                assert planning is not None, "Planning is None!"
+                trimmed = trim_plan_to_task(planning, task)
+                if trimmed != planning:
+                    logger.info(
+                        f"[yellow]Trimmed plan from {len(planning)} to {len(trimmed)} steps for task: {task}[/yellow]"
+                    )
+                    planning = trimmed
+
+                logger.info(f"[yellow]Plan: {planning}[yellow]")
+                # return
+
+                current_monitos = Monitors([SuccessMonitor(), StepMonitor()])
+                try:
+                    status, steps, current_planning = agent_do(
+                        cfg, env, logger, current_monitos, planning, obs, memory_bank
+                    )
+                    video_file = env.save_video(task, status)
+                    t = memory_bank.save_plan(
+                        task,
+                        visual_info,
+                        goal,
+                        status,
+                        current_planning,
+                        steps,
+                        video_file,
+                        environment=environment,
+                    )
                 except Exception as e:
-                    planning = example
-                    planning = render_gpt4_plan(planning)
-                    break
+                    logger.critical(f"Error: {e}")
+                    video_file = env.save_video(task, "failed")
+                    t = video_file
+                monitors.append(current_monitos)
 
-            assert planning is not None, "Planning is None!"
+                logger.info(f"Summary: {current_monitos.get_metric()}")
 
-            logger.info(f"[yellow]Plan: {planning}[yellow]")
-            # return
+                pretty_result(
+                    task, current_monitos.get_metric(), 1, steps=current_monitos.all_steps()
+                )
+                t.join()
+        finally:
+            env.close()
+            logger.info(f"[yellow]Closed MineRL env for task: {task}[/yellow]")
 
-            current_monitos = Monitors([SuccessMonitor(), StepMonitor()])
-            # try:
-            status, steps, current_planning = agent_do(
-                cfg, env, logger, current_monitos, planning, obs, memory_bank
-            )
-            video_file = env.save_video(task, status)
-            # * save planning
-            t = memory_bank.save_plan(
-                task,
-                visual_info,
-                goal,
-                status,
-                current_planning,
-                steps,
-                video_file,
-                environment=environment,
-            )
-            # except Exception as e:
-            #     logger.critical(f"Error: {e}")
-            #     # filename format: videos/v1/{task}/{status}/{time}.mp4
-            #     video_file = env.save_video(task, "failed")
-            # video_file.join()
-            monitors.append(current_monitos)
-
-            logger.info(f"Summary: {current_monitos.get_metric()}")
-
-            pretty_result(
-                task, current_monitos.get_metric(), 1, steps=current_monitos.all_steps()
-            )
-            t.join()
-        env.close()
         all_steps = 0
         for monitor in monitors:
             logger.info(monitor.get_metric())

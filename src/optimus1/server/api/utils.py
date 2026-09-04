@@ -20,6 +20,7 @@ def base64lst2img_path(base64_lst: List[str] | None):
 
     """
     image_root = "api/imgs"
+    os.makedirs(image_root, exist_ok=True)
     image_file_names = []
     if base64_lst is None:
         return []

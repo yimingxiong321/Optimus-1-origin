@@ -4,6 +4,79 @@ from typing import Any, Dict, List
 
 PlanList = List[Dict[str, Any]]
 
+_ITEM_ALIASES = {
+    "log": "logs",
+    "oak_log": "logs",
+    "birch_log": "logs",
+    "spruce_log": "logs",
+    "jungle_log": "logs",
+    "acacia_log": "logs",
+    "dark_oak_log": "logs",
+    "oak_logs": "logs",
+    "tree": "logs",
+    "stick": "stick",
+    "sticks": "stick",
+    "plank": "planks",
+    "oak_planks": "planks",
+    "birch_planks": "planks",
+    "wooden_planks": "planks",
+}
+
+
+def normalize_item(name: str) -> str:
+    item = str(name).strip().lower().replace(" ", "_")
+    return _ITEM_ALIASES.get(item, item)
+
+
+def task_target_item(task: str) -> str:
+    text = " ".join(str(task).lower().split())
+    prefixes = (
+        "smelt and craft a ",
+        "smelt and craft an ",
+        "smelt and craft ",
+        "craft a ",
+        "craft an ",
+        "craft ",
+        "smelt a ",
+        "smelt an ",
+        "smelt ",
+    )
+    for prefix in prefixes:
+        if text.startswith(prefix):
+            return normalize_item(text[len(prefix) :])
+    if "chop" in text and "tree" in text:
+        return "logs"
+    if "dirt" in text:
+        return "dirt"
+    return normalize_item(text.split()[-1]) if text else ""
+
+
+def plan_step_item(step: Dict[str, Any]) -> str:
+    goal = step.get("goal")
+    if isinstance(goal, (list, tuple)) and goal:
+        return normalize_item(goal[0])
+    if isinstance(goal, str):
+        return normalize_item(goal)
+    return ""
+
+
+def plan_ends_with_task(planning: PlanList, task: str) -> bool:
+    if not planning:
+        return False
+    target = task_target_item(task)
+    return bool(target) and plan_step_item(planning[-1]) == target
+
+
+def trim_plan_to_task(planning: PlanList, task: str) -> PlanList:
+    """Keep steps through the first goal that matches the evaluate task."""
+    target = task_target_item(task)
+    if not planning or not target:
+        return planning
+    for idx, step in enumerate(planning):
+        if plan_step_item(step) == target:
+            return planning[: idx + 1]
+    return planning
+
 
 def render_gpt4_plan(plan: str, is_replan: bool = False) -> PlanList:
     plan = plan.replace("<task planning>:", "<task planning>").replace("**", "")

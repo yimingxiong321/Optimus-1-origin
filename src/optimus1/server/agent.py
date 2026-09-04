@@ -181,9 +181,8 @@ class AgentFactory:
     @staticmethod
     def reset():
         if AgentFactory._agent is not None:
-            del AgentFactory._agent
             torch.cuda.empty_cache()
-            AgentFactory._agent = None
+            return AgentFactory._agent
         return AgentFactory.get_agent(
             plan_with_gpt=AgentFactory._args[0],
             plan_model=AgentFactory._args[1],
