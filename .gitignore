@@ -15,16 +15,19 @@ checkpoints/
 # log
 logs/
 log/
+mc_*.log
 
 # videos
 videos/
-imgs
+imgs/
 *.zip
 *.tar.gz
 
 # Memory data (download from HuggingFace, see README)
 src/optimus1/memories/v1/
 src/optimus1/memories/v1_hf_download/
+src/optimus1/memories/baseline_initial/
+src/optimus1/memories/ablation/
 
 # HuggingFace cache
 .cache/
@@ -37,3 +40,16 @@ minerl/gradle.properties
 minerl/launchClient.bat
 minerl/launchClient.sh
 .gradle/
+
+# SpecStory / Cursor local session data
+.specstory/
+.cursorindexingignore
+
+# IDE
+.vscode/
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
