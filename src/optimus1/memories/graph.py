@@ -42,7 +42,12 @@ class KnowledgeGraph:
             result_item = self._extract_output_item(data)
             if result_item == "stick":
                 pass
+            recipe_type = data.get("type", "")
+            prefer = "smelting" in recipe_type or "blasting" in recipe_type
             if result_item not in self._all_recipes:
+                self._all_recipes[result_item] = pattern
+            elif prefer:
+                # Prefer ore smelting over de-crafting recipes (e.g. iron_block -> ingot).
                 self._all_recipes[result_item] = pattern
 
         for k, v in self._all_recipes.items():
