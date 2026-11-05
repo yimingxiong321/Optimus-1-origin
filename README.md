@@ -130,3 +130,13 @@ If you find this work useful for your research, please kindly cite our paper:
 ## Acknowledgement
 - Thanks for these awesome minecraft agents: [VPT](https://arxiv.org/abs/2206.11795), [Voyager](https://arxiv.org/abs/2306.00937), [STEVE-1](https://arxiv.org/abs/2306.00937), [Jarvis-1](https://arxiv.org/abs/2311.05997), etc. Our journey in developing open-world agents began with them.
 - Thanks Xinyi Wang for her constructive comments.
+
+## Voyager-style self-improvement
+
+An automatic curriculum can now select tasks, retrieve existing Optimus plan memories, learn from failed attempts, and resume from a checkpoint using the existing model service:
+
+```bash
+bash scripts/learn.sh learning.groups='[wooden]' learning.max_iterations=3 learning.directory=outputs/learning/smoke
+```
+
+See [learning setup and scope](docs/voyager_learning.md) for full runs, resume, custom task pools, and evaluation limitations.

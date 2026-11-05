@@ -1,0 +1,30 @@
+defaults:
+  - evaluate
+  - _self_
+
+version: learning
+learning:
+  directory: outputs/learning/default
+  resume: false
+  max_iterations: 160
+  max_attempts_per_task: 4
+  selection_retries: 3
+  groups: [wooden, stone, iron, golden, diamond, redstone, armor]
+  # Optional explicit pool: [{id: wood, instruction: chop a tree, target: logs, quantity: 1}]
+  tasks: []
+
+memory:
+  path: ${learning.directory}/memory
+record:
+  video:
+    path: ${learning.directory}/videos
+
+env:
+  max_minutes: 20
+  initial_inventory: []
+
+hydra:
+  job:
+    chdir: false
+  run:
+    dir: ${learning.directory}/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}

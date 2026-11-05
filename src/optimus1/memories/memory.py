@@ -250,15 +250,18 @@ class Memory:
             return res[0]
 
         try:
-            lst_dir = os.listdir(f"src/optimus1/memories/{self.version}/plan/success")
+            success_dir = self.plan_dir_path.replace("<status>", "success")
+            lst_dir = [f for f in os.listdir(success_dir) if f.endswith(".json")]
         except FileNotFoundError:
             # from stratch
+            return None, False
+        if not lst_dir:
             return None, False
         target = get_best_match_recipe(task_key + ".json", lst_dir)
         name_matched = target.lower() == task_key + ".json"
         print(f"Find example: {target}")
         with open(
-            os.path.join(f"src/optimus1/memories/{self.version}/plan/success", target),
+            os.path.join(success_dir, target),
             "r",
         ) as fi:
             data = json.load(fi)
@@ -311,6 +314,7 @@ class Memory:
         def add_dir(path_lst):
             return [os.path.join(self.reflection_dir_path, "img", p) for p in path_lst]
 
+        self.all_reflection_memory = [f for f in os.listdir(self.reflection_dir_path) if f.endswith(".json")]
         similar_task = get_best_match_recipe(
             task.replace(" ", "_") + ".json", self.all_reflection_memory
         )
